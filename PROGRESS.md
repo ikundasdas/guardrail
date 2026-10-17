@@ -1,149 +1,113 @@
-# 开源进度 · guardrail
+# guardrail · 进度
 
-> 状态：**地基已验证，规则层未开工**
-> 最后更新：2026-10-16 下班前
+> 状态：**v0.1.0 已提交本地仓库（commit 38acce7）**，未推送远程
+> 最后更新：2026-10-17
 
-## 这项目要解决什么
+## 现在是什么
 
-给 **AI 生成的代码** 配一套自动化验证。AI 写得快，但它的失败模式是
-**静默的** —— 不崩溃、不报错，只是悄悄地做错事。人肉 review 抓不住，
-因为现象本身看不见（色值漂了、对比度不够、类名撞了、权限没声明）。
+**给 AI 生成的代码配自动化验证**的框架。定位不是 linter，是「验收」。
 
-定位：不是 linter，是**验收**。linter 说「你写错了」，验收说「你做对了但你不知道」。
+核心论点：AI 写的 bug 往往是**静默的** —— 不崩、不报错、测试全绿，
+只是悄悄做错事。人肉 review 抓不住，因为现象本身不可见。
 
-## 已确认的方向
+## 已验证的状态
 
-| 项 | 决定 |
-|---|---|
-| 形态 | 通用 AI 代码验证框架（规则即插件） |
-| 许可证 | MIT |
-| 踩坑记录 | 保留，写进 README —— 这是差异化 |
-| 命名 | `guardrail` |
+```
+npm test          →  46 tests, 46 pass, 0 fail
+node e2e/real-project.js  →  6 项全过（用真实拼豆项目当夹具）
+git status        →  干净，无未提交改动
+```
 
-## 目录
+## 交付物
 
 ```
 guardrail/
-├── package.json          ✓ 零依赖，node >=18，test 用 node:test
+├── package.json               零依赖，Node >=18
+├── README.md                  含「踩坑记录」一节（差异化所在）
+├── LICENSE                    MIT，署名 张云浩
+├── .gitignore / .gitattributes
+├── PROGRESS.md                本文件
+├── guardrail.config.example.js
 ├── src/
-│   ├── utils/color.js    ✓ WCAG 对比度，8 测试全绿
-│   ├── core/             ○ 空 —— 规则加载/配置/输出，待做
-│   ├── rules/            ○ 空 —— 待做
-│   └── cli.js            ○ 未创建（package.json 已引用）
-├── test/
-│   └── color.test.js     ✓ 8/8 通过
-└── examples/             ○ 空
+│   ├── index.js               编程式 API
+│   ├── cli.js                 CLI（--json / --sarif / --only / --list-rules）
+│   ├── core/
+│   │   ├── finding.js         结果结构，why/fix 必填
+│   │   ├── project.js         文件读取唯一入口，读不到 → null
+│   │   ├── rule.js            规则定义与校验
+│   │   ├── runner.js          跑规则 + 兜住崩溃
+│   │   └── reporter.js        text / json / sarif
+│   ├── rules/
+│   │   └── token-drift.js     手抄 token 漂移检测
+│   └── utils/
+│       ├── color.js           WCAG 对比度（官方测试向量校准）
+│       └── scan-config.js     字符串/注释感知的色值扫描
+├── test/                      5 个测试文件
+└── e2e/real-project.js        端到端验证
 ```
 
-`core/` `rules/` `examples/` 三个目录已建但**完全没写**。
+## 三条设计红线（写新规则时别破）
 
-## 当前可运行
+1. **规则必须返回 `{ findings, skipped }`** —— 直接返回数组会被 runner 报错。
+   因为那意味着作者没考虑「检查不了」的情况，而那是最危险的盲区。
+2. **「读不到」绝不能算「通过」** —— `project.read()` 读不到返回 `null`，
+   不是空字符串。规则必须显式记 `skipped`。
+3. **规则崩溃不能静默** —— runner 把异常转成可见的 error（附堆栈），
+   既不让它中断整个检查，也不让它消失。有测试专门钉这两点。
 
-```powershell
-cd D:\study\dsharness\随笔\_oss\guardrail
-npm test          # 8 tests, 8 pass, 0 fail
-```
+## 本轮真正抓到的东西（都是静默 bug）
 
-## 这一轮真正学到的东西
+开发中被自己的测试抓出 **6 个**，全部写进了 README：
 
-写对比度算法时被抓出 **3 个 bug**，其中 2 个是我代码的、1 个是我测试期望写错的。
-**全部是「静默失败」类型** —— 这正是这个项目存在的理由，记录下来当设计原则：
-
-### 1. `m[0]` 是整个匹配串，不是第一个捕获组
-
-```js
-// 错的：从 m[0] 取
-parseInt(m[0], 16)        // parseInt('#2E2A35', 16) → NaN
-// 对的：捕获组从 m[1] 起
-[1,2,3].map(i => parseInt(m[i], 16))
-```
-
-后果链：`NaN` → `map` 变 `null` → 对比度算出 `NaN` → **`NaN < 4.5` 是 `false`**
-→ 所有颜色检查被跳过，规则形同虚设。全程零报错。
-
-### 2. 「读不出来」绝不能兜底成「达标」
-
-```js
-const r = contrastRatio('var(--ink)', '#fff');
-r || 21     // ✗ 把「解析失败」变成「完美达标」
-```
-
-现在统一返回 `null`，调用方必须显式处理。
-
-### 3. 非法输入必须返回 null，不能抛异常
-
-第一版 `contrastRatio` 写成 `isHexColor(fg) ? hexToRgb(fg) : fg`，
-遇到 `var(--ink)` 时把字符串原样传下去 → `rgb.map` 抛 `TypeError` → **整条规则崩掉**。
-一条规则因为一个坏输入整体挂掉，等于这条规则全程失效。
-
-### 4. 检查器的 bug 比被检查的 bug 更危险
-
-来源：拼豆项目里 `check-appjson.js` 的两轮自查。
-剥注释正则 `^\s*//.*$` 遇到 `_comment` 值里的 `://` 会一路吃到行尾，
-把真实的 `__usePrivacyCheck__: true` 吃掉 → **误报「没配置」**。
-
-假警报的破坏力：人会去「修」本来正确的东西。
-所以 guardrail 的规则**每一条都要有「故意写错」的负样本测试**。
-
-### 5. 别为了让测试变绿去改代码
-
-第 6、7 条测试失败时，我的期望写错了：
-- 实际对比度是 **3.31** 不是 2.51（2.51 是 v2 旧配色 `--text-3 = #B9B2A4` 的值）
-- 分界是 **18.66px** 不是 18px
-
-正确做法是**改测试期望**。如果改代码去迎合错误的测试，就会把 18px 粗体
-错误放宽到大字标准 3:1 —— 测试从此背书了一个 bug。
-
-## 下一步（按优先级）
-
-### 1. 核心框架 `src/core/`
-- 规则接口：`{ id, name, severity, check(ctx) → Finding[] }`
-- `Finding` 要能带**文件:行号 + 为什么这是问题 + 怎么修**，
-  不能只有「不通过」。这是和普通 linter 的区别。
-- 配置加载（rc 文件）、规则注册与过滤、`--fix` 先不做
-
-### 2. CLI `src/cli.js`
-`package.json` 已经引用但文件不存在，跑 `npm run check` 会失败。
-
-### 3. 首批规则（从 `quality-check/` 提炼，**要脱掉 `../miniprogram` 硬编码**）
-| 源脚本 | 可提炼的通用规则 | 难度 |
+| # | bug | 为什么危险 |
 |---|---|---|
-| `check-design.js` | token 对比度 / 类名冲突 / 触摸目标 <88rpx / 硬编码色值 | 中 |
-| `check-appjson.js` | **token 漂移**（JSON 手抄 CSS 变量必然漂）/ 隐私三方对照 | 低，最有价值 |
-| `test-gitignore.js` | 密钥是否真被 `.gitignore` 挡住（用 `git check-ignore`） | 低 |
-| `test-legal.js` | 占位符检测 —— 用**临时改文件 + 子进程**验证两条路径 | 低 |
+| 1 | `m[0]` 是整个匹配串，非第一个捕获组 | `NaN` → 对比度 `NaN` → `NaN < 4.5` 为 false → **所有颜色检查被跳过，零报错** |
+| 2 | `r \|\| 21` 兜底 | 把「解析失败」变成「完美达标」 |
+| 3 | 非法输入抛异常而非返 null | 一条规则整体崩掉 = 该规则全程失效 |
+| 4 | 剥注释正则吃了 `://` | 把已正确配置判成「缺失」→ **误报，会让人去改对的东西** |
+| 5 | 测试期望写错（2.51 vs 3.31、18 vs 18.66） | 若改代码迎合错误测试，等于让测试背书一个 bug |
+| 6 | `_comment` 里的色值被当配置 | 改 token 就误报一片，且指向文档 |
 
-**token 漂移**是整个项目最该先做的规则，因为它最通用：
-任何「JSON 里必须手抄设计 token」的场景（小程序、真配置、CI）都成立，
-而手抄就一定会漂。
+第 6 条是本轮最有价值的发现 —— 它催生了 `utils/scan-config.js`
+（逐字符跟踪字符串/注释状态），并带来一整套负样本测试。
 
-### 4. README（差异化就在这）
-必须有：
-- **真实踩坑案例**：`.sw` 类名撞车把色板挤成 48px、`--text-3` 对比度 2.51:1、
-  `__usePrivacyCheck__` 没声明导致真机功能全挂、检查器自己的 bug
-- 一句定位：**别人只有工具，我还有「怎么发现这些坑」的方法论**
-- `examples/` 放一个真实小程序 fixture 当演示
+## 待办
 
-### 5. 收尾
-- `.gitignore`（`node_modules/`、`examples/*/out/`）
-- LICENSE（MIT，填你的名字「张云浩」或你想要的署名）
-- `git init` + 首次提交
-  ⚠️ 注意：`_oss/` 在 `D:\study\dsharness\随笔` 内，而那个目录不是 git 仓库，
-  所以这里 init 是安全的，不会有嵌套仓库问题。
+### 高优先级
+- [ ] **推送到 GitHub**。仓库已 init + commit，但没 remote。
+      注意 `_oss/guardrail/` 在 `D:\study\dsharness\随笔` 内，
+      那个目录不是 git 仓库，所以嵌套没问题。
+- [ ] README 里「一条规则长什么样」的 import 路径写的是
+      `require('guardrail/core/finding')`，但实际包名/导出路径还没验证 npm 上能不能这么引。
+      发 npm 前要确认 exports 字段（现在 package.json 没有 `exports`）。
+- [ ] 加 `exports` 字段到 package.json，否则 `require('guardrail/core/finding')` 不成立。
 
-## 取材来源（原始脚本）
+### 中优先级（第二批规则）
+从 `D:\study\dsharness\随笔\quality-check\` 提炼，**要脱掉 `../miniprogram` 硬编码**：
 
-`D:\study\dsharness\随笔\quality-check\` 共 19 个 JS、约 1400 行。
-**不要整个搬**，里面有大量 `../miniprogram` 硬编码和一次性脚本：
+| 源脚本 | 可提炼规则 | 备注 |
+|---|---|---|
+| `check-appjson.js` | 隐私三方对照（代码调用 ↔ 声明 ↔ 协议正文） | 最有料，规则复杂 |
+| `test-gitignore.js` | 密钥是否真被忽略（用 `git check-ignore` 验） | 简单且通用 |
+| `check-design.js` | 硬编码色值 / 类名冲突 / 触摸目标 <88rpx | 拆分后各自成规则 |
+| `test-legal.js` | 占位符检测（临时改文件 + 子进程验两条路径） | 模式值得复用 |
 
-- **值得提炼**：`check-appjson.js` `check-design.js` `test-gitignore.js` `test-legal.js`
-- **一次性、别搬**：`migrate-v3-*.js`（配色迁移，只对 v2→v3 有意义）、
-  `render-design.js` `compare.js` `lib-render.js`（渲染 PNG 对比图）、
-  `ide-*.js`（依赖微信开发者工具自动化）
-- **强依赖业务数据、难通用**：`check-templates.js` `test-quality.js`
-  `img2template.js`（拼豆 291 色卡、色域距离算法）
+### 低优先级
+- [ ] `--fix` 自动修复（token-drift 理论上可修，但要小心语义）
+- [ ] 规则「适用性」声明（`appliesTo`），非小程序项目自动跳过小程序规则
+- [ ] 英文 README（中文受众好，英文能证明国际化能力 —— 尚未决定）
 
-## 待确认
+## 已知限制
 
-- 项目名 `guardrail` 是不是太泛？GitHub 上重名的话改名
-- README 用中文还是中英双语？（中文受众更好，英文更能证明国际化能力）
+- 只有 1 条规则。框架的地基比内容多 —— 这是有意的（先证明地基能兜住），
+  但**只有 1 条规则的框架说服力不足**，第二批规则要尽快补。
+- `scan-config.js` 只处理类 JSON/JS 对象字面量，不支持 XML/YAML/TOML。
+  小程序 `app.json`、Web `theme.json` 够用，Android `colors.xml` 不行。
+- `--sarif` 输出是手写的最小子集，没在真实 GitHub Code Scanning 上验证过。
+
+## 一个还没验证的假设
+
+README 开头宣称「AI 写的 bug 往往是静默的」——
+这是从拼豆项目 5 个真 bug 归纳出来的，**样本量只有 1 个项目**。
+推广到「AI 生成的代码」整体，逻辑上成立但缺数据。
+如果后面要写文章，这里该补一些外部案例或数据，别只凭一个项目就下结论。
