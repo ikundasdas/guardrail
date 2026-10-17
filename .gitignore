@@ -7,6 +7,9 @@ out/
 *.sarif
 guardrail-report.json
 
+# npm pack 产生的包（e2e/package.js 会在跑完后自己删）
+*.tgz
+
 .DS_Store
 Thumbs.db
 .idea/

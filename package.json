@@ -3,10 +3,26 @@
   "version": "0.1.0",
   "description": "给 AI 生成的代码配自动化验证。规则即插件，跑一次就知道 AI 这次有没有编出看不见的坑。",
   "main": "src/index.js",
+  "bin": {
+    "guardrail": "src/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./core/finding": "./src/core/finding.js",
+    "./core/project": "./src/core/project.js",
+    "./core/rule": "./src/core/rule.js",
+    "./core/runner": "./src/core/runner.js",
+    "./core/reporter": "./src/core/reporter.js",
+    "./utils/color": "./src/utils/color.js",
+    "./utils/scan-config": "./src/utils/scan-config.js",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "test": "node --test",
     "test:e2e": "node e2e/real-project.js",
-    "check": "node src/cli.js"
+    "test:pack": "node e2e/package.js",
+    "check": "node src/cli.js",
+    "prepublishOnly": "npm test"
   },
   "keywords": ["ai-generated-code", "verification", "lint", "static-analysis", "wxapp"],
   "license": "MIT",
