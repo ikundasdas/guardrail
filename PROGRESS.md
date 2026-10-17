@@ -1,6 +1,6 @@
 # guardrail · 进度
 
-> 状态：**v0.1.0 已提交本地仓库（commit 38acce7）**，未推送远程
+> 状态：**v0.1.0 已发布** → https://github.com/ikundasdas/guardrail
 > 最后更新：2026-10-17
 
 ## 现在是什么
@@ -24,7 +24,7 @@ git status        →  干净，无未提交改动
 guardrail/
 ├── package.json               零依赖，Node >=18
 ├── README.md                  含「踩坑记录」一节（差异化所在）
-├── LICENSE                    MIT，署名 张云浩
+├── LICENSE                    MIT，署名 zmxy
 ├── .gitignore / .gitattributes
 ├── PROGRESS.md                本文件
 ├── guardrail.config.example.js
