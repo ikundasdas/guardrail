@@ -1,0 +1,14 @@
+# 统一换行符。
+#
+# 没有这行的话：Windows 上 git 会把 LF 自动转成 CRLF 存进工作区，
+# 而仓库里存的是 LF。同一个人在不同机器上 checkout，diff 会显示
+# 「整个文件都改了」—— 实际只改了换行符，真实改动被淹没。
+#
+# 设成 false：工作区用 LF，仓库也用 LF，不管什么系统都一样。
+text eol=lf
+
+# 二进制文件别做换行转换
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

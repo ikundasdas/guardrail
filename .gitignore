@@ -1,0 +1,14 @@
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# 输出产物
+out/
+*.sarif
+guardrail-report.json
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
