@@ -13,11 +13,15 @@
 ## 已验证的状态
 
 ```
-npm test                  →  51 tests, 51 pass, 0 fail
+npm test                  →  57 tests, 57 pass, 0 fail
 npm run test:e2e          →  6 项全过（用真实拼豆项目当夹具）
 npm run test:pack         →  打包 + 干净安装 + npx/子路径导入，全过
-全新 clone 后跑测试       →  51 pass（别人 clone 下来就能用）
+全新 clone 后跑测试       →  57 pass，且换行符已锁定为 LF
 ```
+
+> 最后一条是专门加的：本机测不出「别人 clone 会怎样」。
+> 上面 10 个 bug 里有 2 个（CRLF 依赖、.gitattributes 失效）
+> 就属于这一类 —— 本机全绿，只有新克隆才发作。
 
 ## 交付物
 
@@ -43,7 +47,10 @@ guardrail/                    仓库名 guardrail，npm 包名 ai-guardrail
 │   └── utils/
 │       ├── color.js           WCAG 对比度（官方测试向量校准）
 │       └── scan-config.js     字符串/注释感知的色值扫描
-├── test/                      6 个测试文件
+├── test/                      7 个测试文件
+│   ├── api / color / runner / scan-config / token-drift   框架与规则
+│   ├── cli.test.js            配置发现（含拼错文件名的回归）
+│   └── repo.test.js           仓库文件自洽（README 包名、.gitattributes）
 └── e2e/
     ├── real-project.js        端到端：用真实拼豆项目当夹具
     └── package.js             端到端：打包 + 干净安装，验证 npx/子路径导入
@@ -60,7 +67,7 @@ guardrail/                    仓库名 guardrail，npm 包名 ai-guardrail
 
 ## 本轮真正抓到的东西（都是静默 bug）
 
-开发中被自己的测试抓出 **6 个**，收尾时又抓到 **3 个**，全部写进了 README：
+开发中被自己的测试抓出 **6 个**，收尾时又抓到 **4 个**，全部写进了 README：
 
 | # | bug | 为什么危险 |
 |---|---|---|
@@ -73,16 +80,18 @@ guardrail/                    仓库名 guardrail，npm 包名 ai-guardrail
 | 7 | `package.json` 缺 `bin` / `exports` / shebang | **README 承诺的 npx 和子路径导入全是空的**。本地 `node src/cli.js` 照样能跑，所以永远发现不了 |
 | 8 | 包名 `guardrail` 在 npm 上已被占用 | README 写 `npx guardrail` 会**静默装上别人的包**，不报错。已改名 `ai-guardrail` |
 | 9 | `CONFIG_NAMES` 里 `guardrail` 拼成 `guradrail` | 多一个 `a`。不崩不报错，只是**那个配置文件永远加载不到** |
+| 10 | `.gitattributes` 少了开头的 `*` | `text eol=lf` 变成匹配「名为 text 的文件」→ 换行符根本没锁住。**且只在别人的机器上发作** |
 
 第 6 条是本轮最有价值的发现 —— 它催生了 `utils/scan-config.js`
 （逐字符跟踪字符串/注释状态），并带来一整套负样本测试。
 
-第 7、8、9 条是同一类问题的三个面：**磁盘上的东西和文档/预期不一致，但没有任何信号**。
+第 7~10 条是同一类问题的四个面：**磁盘上的东西和文档/预期不一致，但没有任何信号**。
 - 7 是「本地路径 ≠ 用户路径」→ 用 `e2e/package.js` 真实打包安装来验
 - 8 是「文档里的名字指向了别人的东西」→ 写文档前去 registry 查一次
-- 9 是「拼错的常量永远静默不生效」→ 用 `test/cli.test.js` 真建文件来验，而不是断言代码里写了什么
+- 9 是「拼错的常量永远静默不生效」→ 用 `test/cli.test.js` 真建文件来验
+- 10 是「配置文件语法错了等于没写」→ 用 `git check-attr` 问 git 本人
 
-三条的共同解法：**别断言「我以为它是什么」，去断言「它实际做了什么」。**
+十条的共同解法只有一句：**别断言「我以为它是什么」，去断言「它实际做了什么」。**
 
 ## 待办
 

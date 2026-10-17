@@ -280,6 +280,42 @@ const CONFIG_NAMES = ['guardrail.config.js', '.guradrailrc.js', '.guardrailrc.js
 而是真的把三个文件建出来、调 `loadConfig` 看能不能找到。
 拼错的名字会在测试里立刻现形。
 
+### 10. `.gitattributes` 少了开头的 `*`，整个文件形同虚设
+
+想统一换行符，写了这个文件：
+
+```
+# 统一换行符
+text eol=lf        ← 少了开头的 *
+```
+
+`gitattributes` 的行格式是「模式 属性…」。没有 `*`，
+`text` 就被当成了**文件名模式** —— 匹配一个叫 `text` 的文件，
+也就是谁都不匹配。这一行等于没写。
+
+问 git 本人，它对 `README.md` 一言不发：
+
+```bash
+$ git check-attr -a README.md
+$                      # 什么都没返回 = 没有任何属性作用到这个文件上
+```
+
+改成 `* text eol=lf` 之后：
+
+```bash
+$ git check-attr -a README.md
+README.md: text: set
+README.md: eol: lf     # 这才叫生效
+```
+
+这个 bug 特别阴的地方在于：**它只在别人的机器上发作**。
+本机文件本来就是 LF，怎么看都正常；只有别人 clone 到 Windows 上，
+才会发现换行符根本没被锁住。
+
+所以 `test/repo.test.js` 里有两条：一条静态检查每行的模式
+（属性名当模式 = 漏了 `*`），一条直接问 `git check-attr`。
+**「文件里写了什么」和「git 实际怎么处理」是两回事。**
+
 ## 开发
 
 ```bash
