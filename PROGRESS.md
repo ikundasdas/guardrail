@@ -13,16 +13,16 @@
 ## 已验证的状态
 
 ```
-npm test                  →  46 tests, 46 pass, 0 fail
+npm test                  →  51 tests, 51 pass, 0 fail
 npm run test:e2e          →  6 项全过（用真实拼豆项目当夹具）
 npm run test:pack         →  打包 + 干净安装 + npx/子路径导入，全过
-全新 clone 后跑测试       →  46 pass（别人 clone 下来就能用）
+全新 clone 后跑测试       →  51 pass（别人 clone 下来就能用）
 ```
 
 ## 交付物
 
 ```
-guardrail/
+guardrail/                    仓库名 guardrail，npm 包名 ai-guardrail
 ├── package.json               零依赖，Node >=18
 ├── README.md                  含「踩坑记录」一节（差异化所在）
 ├── LICENSE                    MIT，署名 zmxy
@@ -43,7 +43,7 @@ guardrail/
 │   └── utils/
 │       ├── color.js           WCAG 对比度（官方测试向量校准）
 │       └── scan-config.js     字符串/注释感知的色值扫描
-├── test/                      5 个测试文件
+├── test/                      6 个测试文件
 └── e2e/
     ├── real-project.js        端到端：用真实拼豆项目当夹具
     └── package.js             端到端：打包 + 干净安装，验证 npx/子路径导入
@@ -60,7 +60,7 @@ guardrail/
 
 ## 本轮真正抓到的东西（都是静默 bug）
 
-开发中被自己的测试抓出 **6 个**，收尾时又抓到第 7 个，全部写进了 README：
+开发中被自己的测试抓出 **6 个**，收尾时又抓到 **3 个**，全部写进了 README：
 
 | # | bug | 为什么危险 |
 |---|---|---|
@@ -70,21 +70,32 @@ guardrail/
 | 4 | 剥注释正则吃了 `://` | 把已正确配置判成「缺失」→ **误报，会让人去改对的东西** |
 | 5 | 测试期望写错（2.51 vs 3.31、18 vs 18.66） | 若改代码迎合错误测试，等于让测试背书一个 bug |
 | 6 | `_comment` 里的色值被当配置 | 改 token 就误报一片，且指向文档 |
-| 7 | `package.json` 缺 `bin` / `exports` / shebang | **README 承诺的 `npx guardrail` 和 `require('guardrail/core/finding')` 全是空的**。本地 `node src/cli.js` 照样能跑，所以永远发现不了 |
+| 7 | `package.json` 缺 `bin` / `exports` / shebang | **README 承诺的 npx 和子路径导入全是空的**。本地 `node src/cli.js` 照样能跑，所以永远发现不了 |
+| 8 | 包名 `guardrail` 在 npm 上已被占用 | README 写 `npx guardrail` 会**静默装上别人的包**，不报错。已改名 `ai-guardrail` |
+| 9 | `CONFIG_NAMES` 里 `guardrail` 拼成 `guradrail` | 多一个 `a`。不崩不报错，只是**那个配置文件永远加载不到** |
 
 第 6 条是本轮最有价值的发现 —— 它催生了 `utils/scan-config.js`
 （逐字符跟踪字符串/注释状态），并带来一整套负样本测试。
 
-第 7 条则是「文档说了但实际不工作」的典型：**本地开发路径和用户使用路径不是同一条**，
-只有真的 `npm pack` + 装到干净项目里跑，才能暴露。这就是 `e2e/package.js` 的由来。
+第 7、8、9 条是同一类问题的三个面：**磁盘上的东西和文档/预期不一致，但没有任何信号**。
+- 7 是「本地路径 ≠ 用户路径」→ 用 `e2e/package.js` 真实打包安装来验
+- 8 是「文档里的名字指向了别人的东西」→ 写文档前去 registry 查一次
+- 9 是「拼错的常量永远静默不生效」→ 用 `test/cli.test.js` 真建文件来验，而不是断言代码里写了什么
+
+三条的共同解法：**别断言「我以为它是什么」，去断言「它实际做了什么」。**
 
 ## 待办
 
 ### 高优先级
 - [x] **推送到 GitHub** → https://github.com/ikundasdas/guardrail （master 改名 main，
       公开仓库，topics 已设）
-- [x] 加 `bin` / `exports` / shebang，并用 `e2e/package.js` 验证 `npx guardrail`
-      和 `require('guardrail/core/finding')` 真的可用（原先 README 承诺的用法全是空的）
+- [x] 加 `bin` / `exports` / shebang，并用 `e2e/package.js` 验证 npx
+      和子路径导入真的可用（原先 README 承诺的用法全是空的）
+- [x] 包名改为 `ai-guardrail`（`guardrail` 在 npm 上已被占用）
+- [ ] **发布到 npm `ai-guardrail`**。发布后 README 的安装一节可以去掉
+      「还没发布」的说明，改成标准的 `npx ai-guardrail`。
+      需要一次性 `npm login` —— 发布前先 `npm run test:pack` 确认包内容。
+- [ ] 补 `repository` / `homepage` 之外的 npm 元数据（已加，发布时核对一遍）
 - [ ] 真机/真实项目用一段时间，积累第 2、3 个用户场景（目前只有拼豆一个）
 
 ### 中优先级（第二批规则）

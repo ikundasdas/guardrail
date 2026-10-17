@@ -6,7 +6,7 @@
 「这里做对了但你以为它做对了，其实没有」。
 
 ```bash
-npx guardrail
+npx github:ikundasdas/guardrail
 ```
 
 ```
@@ -47,9 +47,15 @@ guardrail 把这些「看不见的检查」变成可执行的文件。
 
 ## 安装
 
+还没发布到 npm。原因是 `guardrail` 这个名字在 npm 上已被一个无关的
+ESLint 规则集占用（2022 年的 0.0.1）—— 如果 README 写 `npx guardrail`，
+用户会**装上别人的包**，而且不会报错。本包会以 `ai-guardrail` 的名字发布。
+
+现在可以直接从 GitHub 装：
+
 ```bash
-npm install -D guardrail
-npx guardrail --root ./miniprogram
+npx github:ikundasdas/guardrail                      # 不安装，跑一次
+npm install -D github:ikundasdas/guardrail           # 或装成开发依赖
 ```
 
 零依赖，Node >= 18。
@@ -57,12 +63,12 @@ npx guardrail --root ./miniprogram
 ## 用法
 
 ```bash
-guardrail                        # 检查当前目录
-guardrail --root ./miniprogram   # 指定根目录
-guardrail --only token-drift     # 只跑一条规则
-guardrail --json                 # 机器可读
-guardrail --sarif                # GitHub Code Scanning（PR 里显示行内标注）
-guardrail --list-rules           # 列出所有规则
+ai-guardrail                        # 检查当前目录
+ai-guardrail --root ./miniprogram   # 指定根目录
+ai-guardrail --only token-drift     # 只跑一条规则
+ai-guardrail --json                 # 机器可读
+ai-guardrail --sarif                # GitHub Code Scanning（PR 里显示行内标注）
+ai-guardrail --list-rules           # 列出所有规则
 ```
 
 **退出码**：`0` 通过 / `1` 有问题 / `2` 工具自身出错。
@@ -105,7 +111,7 @@ module.exports = {
 ## 一条规则长什么样
 
 ```js
-const { finding, skipped } = require('guardrail/core/finding');
+const { finding, skipped } = require('ai-guardrail/core/finding');
 
 module.exports.rule = {
   id: 'my-rule',
@@ -228,9 +234,9 @@ isHexColor(fg) ? hexToRgb(fg) : fg
 三个都缺，但**本地开发完全感觉不到**：
 
 ```bash
-node src/cli.js          # 好用得很
-npx guardrail            # 失败：找不到可执行文件
-require('guardrail/core/finding')   # 失败：包没声明这个子路径
+node src/cli.js                        # 好用得很
+npx ai-guardrail                       # 失败：找不到可执行文件
+require('ai-guardrail/core/finding')   # 失败：包没声明这个子路径
 ```
 
 README 里这两条用法都写着 —— 文档承诺了，包不兑现。
@@ -243,6 +249,37 @@ README 里这两条用法都写着 —— 文档承诺了，包不兑现。
 Node 按「文件所在位置」向上找 `node_modules`，不看 cwd ——
 差点把「我路径写错了」误诊成「包的 exports 坏了」。
 
+### 8. 文档里的包名指向了别人的包
+
+README 一直写着 `npx guardrail`。收尾时顺手查了一下 npm ——
+`guardrail` 这个名字**已经被占了**（一个无关的 ESLint 规则集，2022 年的 0.0.1）。
+
+于是这条命令不会失败，它会**静默地装上别人的包**。
+用户以为在跑你的工具，其实跑的是别人的 ESLint 插件。
+
+比「报错」难发现得多，因为没有任何错误信息。
+
+教训：包名必须在写进文档**之前**去 registry 查一次。
+本包因此改名 `ai-guardrail`（仓库名仍是 `guardrail`）。
+
+### 9. 拼错的常量不会报错，只是永远不生效
+
+`cli.js` 里配置文件名列表长这样：
+
+```js
+const CONFIG_NAMES = ['guardrail.config.js', '.guradrailrc.js', '.guardrailrc.json'];
+//                                                ^^^^^^^^ guardrail 拼成了 guradrail
+```
+
+多一个 `a`。这个字不会让任何东西崩溃 —— 只是**那个配置文件永远加载不到**。
+
+用户照着文档建了 `.guardrailrc.js`，工具当作没看见，然后按默认配置跑。
+没有报错、没有警告、没有线索，只有「怎么改了配置没反应」。
+
+修完之后加了 `test/cli.test.js`：不看代码里写了哪些名字，
+而是真的把三个文件建出来、调 `loadConfig` 看能不能找到。
+拼错的名字会在测试里立刻现形。
+
 ## 开发
 
 ```bash
@@ -252,7 +289,7 @@ npm run test:pack  # 打包 + 装进干净项目，验证 npx 和子路径导入
 ```
 
 `test:pack` 值得单独说一句：它会 `npm pack` 出真实包、装进临时项目，
-再跑 `npx guardrail` 和 `require('guardrail/core/finding')`。
+再跑 `npx ai-guardrail` 和 `require('ai-guardrail/core/finding')`。
 之所以要这么做，是因为 `bin` / `exports` / shebang 缺失时，
 本地 `node src/cli.js` 照样能跑，开发者根本不会察觉 —— 但用户会失败。
 
