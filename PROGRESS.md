@@ -13,9 +13,10 @@
 ## 已验证的状态
 
 ```
-npm test          →  46 tests, 46 pass, 0 fail
-node e2e/real-project.js  →  6 项全过（用真实拼豆项目当夹具）
-git status        →  干净，无未提交改动
+npm test                  →  46 tests, 46 pass, 0 fail
+npm run test:e2e          →  6 项全过（用真实拼豆项目当夹具）
+npm run test:pack         →  打包 + 干净安装 + npx/子路径导入，全过
+全新 clone 后跑测试       →  46 pass（别人 clone 下来就能用）
 ```
 
 ## 交付物
@@ -43,7 +44,9 @@ guardrail/
 │       ├── color.js           WCAG 对比度（官方测试向量校准）
 │       └── scan-config.js     字符串/注释感知的色值扫描
 ├── test/                      5 个测试文件
-└── e2e/real-project.js        端到端验证
+└── e2e/
+    ├── real-project.js        端到端：用真实拼豆项目当夹具
+    └── package.js             端到端：打包 + 干净安装，验证 npx/子路径导入
 ```
 
 ## 三条设计红线（写新规则时别破）
@@ -57,7 +60,7 @@ guardrail/
 
 ## 本轮真正抓到的东西（都是静默 bug）
 
-开发中被自己的测试抓出 **6 个**，全部写进了 README：
+开发中被自己的测试抓出 **6 个**，收尾时又抓到第 7 个，全部写进了 README：
 
 | # | bug | 为什么危险 |
 |---|---|---|
@@ -67,20 +70,22 @@ guardrail/
 | 4 | 剥注释正则吃了 `://` | 把已正确配置判成「缺失」→ **误报，会让人去改对的东西** |
 | 5 | 测试期望写错（2.51 vs 3.31、18 vs 18.66） | 若改代码迎合错误测试，等于让测试背书一个 bug |
 | 6 | `_comment` 里的色值被当配置 | 改 token 就误报一片，且指向文档 |
+| 7 | `package.json` 缺 `bin` / `exports` / shebang | **README 承诺的 `npx guardrail` 和 `require('guardrail/core/finding')` 全是空的**。本地 `node src/cli.js` 照样能跑，所以永远发现不了 |
 
 第 6 条是本轮最有价值的发现 —— 它催生了 `utils/scan-config.js`
 （逐字符跟踪字符串/注释状态），并带来一整套负样本测试。
 
+第 7 条则是「文档说了但实际不工作」的典型：**本地开发路径和用户使用路径不是同一条**，
+只有真的 `npm pack` + 装到干净项目里跑，才能暴露。这就是 `e2e/package.js` 的由来。
+
 ## 待办
 
 ### 高优先级
-- [ ] **推送到 GitHub**。仓库已 init + commit，但没 remote。
-      注意 `_oss/guardrail/` 在 `D:\study\dsharness\随笔` 内，
-      那个目录不是 git 仓库，所以嵌套没问题。
-- [ ] README 里「一条规则长什么样」的 import 路径写的是
-      `require('guardrail/core/finding')`，但实际包名/导出路径还没验证 npm 上能不能这么引。
-      发 npm 前要确认 exports 字段（现在 package.json 没有 `exports`）。
-- [ ] 加 `exports` 字段到 package.json，否则 `require('guardrail/core/finding')` 不成立。
+- [x] **推送到 GitHub** → https://github.com/ikundasdas/guardrail （master 改名 main，
+      公开仓库，topics 已设）
+- [x] 加 `bin` / `exports` / shebang，并用 `e2e/package.js` 验证 `npx guardrail`
+      和 `require('guardrail/core/finding')` 真的可用（原先 README 承诺的用法全是空的）
+- [ ] 真机/真实项目用一段时间，积累第 2、3 个用户场景（目前只有拼豆一个）
 
 ### 中优先级（第二批规则）
 从 `D:\study\dsharness\随笔\quality-check\` 提炼，**要脱掉 `../miniprogram` 硬编码**：

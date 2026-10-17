@@ -221,12 +221,40 @@ isHexColor(fg) ? hexToRgb(fg) : fg
 现在扫描器逐字符跟踪字符串/注释状态和「当前 key」，会排除注释型 key 的值。
 而且专门测了 `https://example.com/#FF0000` 这种 URL 里的 `#` 不会被误判。
 
+### 7. 本地能跑 ≠ 用户能用
+
+收尾时发现 `package.json` 里没有 `bin`、没有 `exports`，`cli.js` 也没有 shebang。
+
+三个都缺，但**本地开发完全感觉不到**：
+
+```bash
+node src/cli.js          # 好用得很
+npx guardrail            # 失败：找不到可执行文件
+require('guardrail/core/finding')   # 失败：包没声明这个子路径
+```
+
+README 里这两条用法都写着 —— 文档承诺了，包不兑现。
+
+这类问题只有一种抓法：`npm pack` 出真实包，装进一个**干净的项目**，
+按文档写的方式跑一遍。`e2e/package.js` 干的就是这件事。
+
+顺带一提，写这个验证脚本时我自己也踩了一下：
+把探针文件建在了消费者目录**外面**，于是 `require` 找不到已安装的包。
+Node 按「文件所在位置」向上找 `node_modules`，不看 cwd ——
+差点把「我路径写错了」误诊成「包的 exports 坏了」。
+
 ## 开发
 
 ```bash
-npm test          # 单元测试
-npm run test:e2e  # 用真实小程序的端到端验证（没该项目时自动跳过）
+npm test           # 单元测试
+npm run test:e2e   # 用真实小程序的端到端验证（没该项目时自动跳过）
+npm run test:pack  # 打包 + 装进干净项目，验证 npx 和子路径导入真的可用
 ```
+
+`test:pack` 值得单独说一句：它会 `npm pack` 出真实包、装进临时项目，
+再跑 `npx guardrail` 和 `require('guardrail/core/finding')`。
+之所以要这么做，是因为 `bin` / `exports` / shebang 缺失时，
+本地 `node src/cli.js` 照样能跑，开发者根本不会察觉 —— 但用户会失败。
 
 ## 许可
 
