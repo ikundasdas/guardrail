@@ -1,11 +1,13 @@
 # 统一换行符。
 #
-# 没有这行的话：Windows 上 git 会把 LF 自动转成 CRLF 存进工作区，
-# 而仓库里存的是 LF。同一个人在不同机器上 checkout，diff 会显示
+# 没有这行的话：Windows 上 git 默认 core.autocrlf=true，会把工作区的
+# LF 换成 CRLF。结果是同一个人在不同机器上 checkout，diff 显示
 # 「整个文件都改了」—— 实际只改了换行符，真实改动被淹没。
 #
-# 设成 false：工作区用 LF，仓库也用 LF，不管什么系统都一样。
-text eol=lf
+# 注意开头的 `*` 不能少。写成 `text eol=lf`（没有 `*`）的话，
+# git 会把 `text` 当成文件名模式 —— 匹配一个叫 text 的文件，
+# 也就是什么都不匹配。文件看着配好了，实际完全失效。
+* text eol=lf
 
 # 二进制文件别做换行转换
 *.png binary

@@ -15,7 +15,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { loadConfig, main } = require('../src/cli');
+const { loadConfig } = require('../src/cli');
 
 /** 建一个临时工作目录，用完自动删。 */
 function tempRoot(t) {
@@ -79,75 +79,6 @@ test('JSON 配置文件非法时报明确错误，而不是静默跳过', (t) =>
 });
 
 // ---------------------------------------------------------------------------
-// 下面两个用例防的是同一类问题：**同一个名字散落在多个文件里，改一处漏一处**。
-// 包从 guardrail 改名 ai-guardrail 时，帮助文本和 README 都可能忘了跟着改。
-// 这类残留不会报错，只会让用户敲了一个不存在的命令（或者更糟，别人的包）。
+// 注：README / package.json / .gitattributes 之间的一致性检查在
+// test/repo.test.js —— 那些是「仓库文件是否自洽」，和 CLI 行为不是一回事。
 // ---------------------------------------------------------------------------
-
-const REPO = path.join(__dirname, '..');
-const readPkg = () => JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
-
-test('--help 显示的命令名与 package.json 的 bin 一致', (t) => {
-  const pkg = readPkg();
-  const binName = Object.keys(pkg.bin || {})[0];
-  assert.ok(binName, 'package.json 必须有 bin，否则用户没法调用');
-
-  const out = captureStdout(() => main(['--help']));
-  assert.match(out, new RegExp(`用法\\s*\\n\\s*${binName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\[选项\\]`),
-    `帮助文本里必须写 ${binName}，否则用户照帮助敲的命令不存在`);
-});
-
-test('README 里所有 npx 命令都指向真实存在的包名', () => {
-  const pkg = readPkg();
-  const binName = Object.keys(pkg.bin || {})[0];
-  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
-
-  // 只看围栏代码块里的命令。
-  // 正文里会引用旧名字来说明「为什么改名」（比如讲述 npm 重名那段），
-  // 那是叙述而不是给用户敲的指令 —— 把它也当成命令会逼着人把说明写含糊。
-  const code = [...readme.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1]).join('\n');
-
-  // 逐行看，只看「行首就是 npx」的。
-  // 代码块里的注释也会出现 npx 字样（比如 `# 验证 npx 和子路径导入真的可用`），
-  // 那是说明文字；整行首是 # 的直接跳过，行尾注释也先剥掉。
-  const cmds = [];
-  for (const raw of code.split('\n')) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    const body = line.split(/\s+#/)[0];
-    const m = /^npx\s+([^\s`#]+)/.exec(body);
-    if (m && m[1] !== '-y' && m[1] !== '--yes') cmds.push(m[1]);
-  }
-  assert.ok(cmds.length > 0, 'README 的代码块里应该至少有一条 npx 用法');
-
-  for (const c of cmds) {
-    const ok = c === binName || c.startsWith('github:');
-    assert.ok(ok, `README 代码块里的 \`npx ${c}\` 有问题：既不是本包的命令 ${binName}，`
-      + '也不是 github: 安装。如果这个名字在 npm 上属于别人，用户会静默装上别人的包');
-  }
-});
-
-test('README 里的 require 子路径用的是本包的包名', () => {
-  const pkg = readPkg();
-  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
-
-  const specs = [...readme.matchAll(/require\('([^']+)'\)/g)].map((m) => m[1]);
-  for (const s of specs) {
-    const root = s.split('/')[0];
-    if (root.startsWith('.') || root.startsWith('node:')) continue;
-    assert.equal(root, pkg.name, `README 里 require('${s}') 用的包名和 package.json 的 ${pkg.name} 不一致`);
-  }
-});
-
-/** 临时接住 process.stdout.write，拿到 CLI 的输出。 */
-function captureStdout(fn) {
-  const orig = process.stdout.write;
-  let buf = '';
-  process.stdout.write = (s) => { buf += s; return true; };
-  try {
-    fn();
-  } finally {
-    process.stdout.write = orig;
-  }
-  return buf;
-}
