@@ -2,14 +2,21 @@
 //
 // 为什么要专门验：package.json 缺 bin / exports / shebang 时，
 // 本地 `node src/cli.js` 照样能跑，开发者完全不会察觉 ——
-// 但用户 `npx guardrail` 会失败、`require('guardrail/core/finding')` 会失败。
+// 但用户 `npx <包名>` 会失败、`require('<包名>/core/finding')` 会失败。
 // 「文档写了但实际不工作」是典型静默问题，必须在发布前用真实安装验一次。
+//
+// 包名一律从 package.json 读，不写死 —— 写死的话改了名这个测试照样绿，
+// 而它要验的恰恰是「文档里的名字和包里的名字是否一致」。
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
 const PKG = path.join(__dirname, '..');
+const pkg = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8'));
+const NAME = pkg.name;
+// bin 只有一个时，命令名就是它；用 bin 的名字而不是包名去 npx
+const BIN = Object.keys(pkg.bin || {})[0] || NAME;
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'guardrail-pack-'));
 let bad = 0;
 
@@ -20,6 +27,7 @@ try {
   // 1) 打包
   const tgz = run('npm', ['pack', '--silent'], { cwd: PKG }).trim().split('\n').pop().trim();
   const tgzPath = path.join(PKG, tgz);
+  console.log(`  包名: ${NAME}   命令: ${BIN}`);
   console.log(`  包文件: ${tgz}  (${(fs.statSync(tgzPath).size / 1024).toFixed(1)} KB)`);
 
   // 2) 装进干净项目
@@ -38,19 +46,19 @@ try {
   // 4) 用 npx 跑 CLI —— README 承诺的用法
   let out = '';
   try {
-    out = run('npx', ['--no-install', 'guardrail', '--root', proj], { cwd: consumer });
+    out = run('npx', ['--no-install', BIN, '--root', proj], { cwd: consumer });
   } catch (e) {
     out = (e.stdout || '') + (e.stderr || '');
     if (e.status === 1) {
       // 退出码 1 = 发现问题，这是预期行为
     } else {
-      console.log(`  ✗ npx guardrail 异常退出 code=${e.status}`);
+      console.log(`  ✗ npx ${BIN} 异常退出 code=${e.status}`);
       console.log(out.slice(0, 500));
       bad++;
     }
   }
-  if (/#26262E/.test(out) && /--ink/.test(out)) console.log('  ✓ npx guardrail 可用，且抓到了漂移');
-  else { console.log('  ✗ npx guardrail 没抓到漂移'); console.log(out.slice(0, 400)); bad++; }
+  if (/#26262E/.test(out) && /--ink/.test(out)) console.log(`  ✓ npx ${BIN} 可用，且抓到了漂移`);
+  else { console.log(`  ✗ npx ${BIN} 没抓到漂移`); console.log(out.slice(0, 400)); bad++; }
 
   // 5) 验证 exports 子路径 —— README 的规则示例用到
   //
@@ -60,9 +68,9 @@ try {
   // 从而把「测试脚本路径写错」误诊成「包的 exports 坏了」。已踩过。
   const probe = path.join(consumer, 'probe.js');
   fs.writeFileSync(probe, `
-    const { finding, skipped } = require('guardrail/core/finding');
-    const { defineRule } = require('guardrail/core/rule');
-    const api = require('guardrail');
+    const { finding, skipped } = require('${NAME}/core/finding');
+    const { defineRule } = require('${NAME}/core/rule');
+    const api = require('${NAME}');
     console.log('finding:', typeof finding, 'skipped:', typeof skipped, 'defineRule:', typeof defineRule);
     console.log('api.guardrail:', typeof api.guardrail, 'api.SEVERITY:', typeof api.SEVERITY);
   `);

@@ -5,11 +5,11 @@
  * guardrail CLI。
  *
  * 用法：
- *   guardrail                     检查当前目录
- *   guardrail --root ./miniprogram
- *   guardrail --only token-drift
- *   guardrail --json              机器读
- *   guardrail --sarif             给 GitHub Code Scanning
+ *   ai-guardrail                   检查当前目录
+ *   ai-guardrail --root ./miniprogram
+ *   ai-guardrail --only token-drift
+ *   ai-guardrail --json            机器读
+ *   ai-guardrail --sarif           给 GitHub Code Scanning
  *
  * 退出码：0 = 通过，1 = 有 error，2 = 工具自身出错。
  * 分这两个码是有意的：「你的项目有问题」和「工具坏了」要能区分，
@@ -23,7 +23,12 @@ const reporter = require('./core/reporter');
 const pkg = require('../package.json');
 
 const RULES_DIR = path.join(__dirname, 'rules');
-const CONFIG_NAMES = ['guardrail.config.js', '.guradrailrc.js', '.guardrailrc.json'];
+const CONFIG_NAMES = ['guardrail.config.js', '.guardrailrc.js', '.guardrailrc.json'];
+
+// 命令名从 package.json 的 bin 读，不写死 ——
+// 包改名时（guardrail → ai-guardrail）写死的帮助文本会继续显示旧名字，
+// 而用户正是照帮助文本敲命令的。
+const BIN_NAME = Object.keys(pkg.bin || {})[0] || pkg.name;
 
 function parseArgs(argv) {
   const o = { root: '.', only: null, format: 'text', quiet: false, showInfo: true, config: null, listRules: false };
@@ -45,10 +50,10 @@ function parseArgs(argv) {
 }
 
 const HELP = `
-guardrail —— 给 AI 生成的代码配自动化验证
+${BIN_NAME} —— 给 AI 生成的代码配自动化验证
 
 用法
-  guardrail [选项]
+  ${BIN_NAME} [选项]
 
 选项
   -r, --root <dir>     项目根目录（默认当前目录）

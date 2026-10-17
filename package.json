@@ -1,11 +1,19 @@
 {
-  "name": "guardrail",
+  "name": "ai-guardrail",
   "version": "0.1.0",
   "description": "给 AI 生成的代码配自动化验证。规则即插件，跑一次就知道 AI 这次有没有编出看不见的坑。",
   "main": "src/index.js",
   "bin": {
-    "guardrail": "src/cli.js"
+    "ai-guardrail": "src/cli.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ikundasdas/guardrail.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ikundasdas/guardrail/issues"
+  },
+  "homepage": "https://github.com/ikundasdas/guardrail#readme",
   "exports": {
     ".": "./src/index.js",
     "./core/finding": "./src/core/finding.js",
